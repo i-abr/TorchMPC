@@ -7,10 +7,9 @@ from torch.distributions import Normal
 
 class ShootingMethod(object):
 
-    def __init__(self, model, policy, T=10, lr=0.1):
+    def __init__(self, model, T=10, lr=0.02):
         self.T = T
         self.model = model
-        self.policy= policy
 
         self.state_dim = model.num_states
         self.action_dim = model.num_actions
@@ -19,42 +18,28 @@ class ShootingMethod(object):
         if torch.cuda.is_available():
             self.device = 'cuda:0'
         self.lr = lr
-        # self.K = torch.randn(T, self.action_dim, self.state_dim).to(self.device)
         self.u = torch.zeros(T, self.action_dim).to(self.device)
-        # self.lam = torch.zeros(T, self.action_dim).to(self.device)
-        # self.K.requires_grad = True
         self.u.requires_grad = True
-        self.rho = 0.#1e-2
+
+        self.optim = optim.SGD([self.u], lr=lr)
 
     def reset(self):
         with torch.no_grad():
             self.u.zero_()
 
-    def update_constraint(self, state):
-        with torch.no_grad():
+
+    def update(self, state, epochs=2):
+        for epoch in range(epochs):
             s = torch.FloatTensor(state).unsqueeze(0).to(self.device)
             cost = 0.
-            i = 0
-            for K, u, lam in zip(self.K, self.u, self.lam):
-                mu, _ = self.policy(s)
-                ubar = torch.mv(K, s.squeeze()) + u
-                s, r = self.model.step(s, ubar.unsqueeze(0))
-                self.lam[i] += self.rho * (torch.tanh(mu.squeeze()) - ubar)
-                i += 1
+            for u in self.u:
+                s, r = self.model.step(s, torch.tanh(u.unsqueeze(0)))
+                cost = cost - r
 
-    def update(self, state):
-        s = torch.FloatTensor(state).unsqueeze(0).to(self.device)
-
-        cost = 0.
-        rho_2 = self.rho/2.0
-        for u in self.u:
-            s, r = self.model.step(s, torch.tanh(u.unsqueeze(0)))
-            cost = cost + r
-
-        cost.backward()
+            self.optim.zero_grad()
+            cost.backward()
+            self.optim.step()
         with torch.no_grad():
-            self.u += self.lr * self.u.grad
-            self.u.grad.zero_()
             u = torch.tanh(self.u[0].cpu().clone()).numpy()
             self.u[:-1] = self.u[1:].clone()
             self.u[-1].zero_()

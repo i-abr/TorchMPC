@@ -13,6 +13,7 @@ import envs
 
 import torch
 from mpc_lib import iLQR
+from mpc_lib import ShootingMethod
 from model import ModelOptimizer, Model, SARSAReplayBuffer
 from normalized_actions import NormalizedActions
 import argparse
@@ -85,7 +86,8 @@ if __name__ == '__main__':
     model_optim = ModelOptimizer(model, model_replay_buffer, lr=args.model_lr)
     # model_optim = MDNModelOptimizer(model, replay_buffer, lr=args.model_lr)
 
-    gps_planner = iLQR(model, T=args.horizon)
+    # gps_planner = iLQR(model, T=args.horizon)
+    mpc_planner = ShootingMethod(model, T=args.horizon)
 
     max_frames  = args.max_frames
     max_steps   = args.max_steps
@@ -98,9 +100,9 @@ if __name__ == '__main__':
     ep_num = 0
     while frame_idx < max_frames:
         state = env.reset()
-        gps_planner.reset()
+        mpc_planner.reset()
 
-        action = gps_planner.update(state)
+        action = mpc_planner.update(state)
         # action = policy_net.get_action(state)
 
         episode_reward = 0
@@ -109,7 +111,7 @@ if __name__ == '__main__':
             for _ in range(frame_skip):
                 next_state, reward, done, _ = env.step(action.copy())
 
-            next_action = gps_planner.update(next_state)
+            next_action = mpc_planner.update(next_state)
             # next_action = policy_net.get_action(next_state)
             if True:
                 eps = 1.0 * (0.995**frame_idx)
