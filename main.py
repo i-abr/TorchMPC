@@ -14,6 +14,8 @@ import envs
 import torch
 from mpc_lib import iLQR
 from mpc_lib import ShootingMethod
+from mpc_lib import MPPI
+
 from model import ModelOptimizer, Model, SARSAReplayBuffer
 from normalized_actions import NormalizedActions
 import argparse
@@ -87,8 +89,8 @@ if __name__ == '__main__':
     # model_optim = MDNModelOptimizer(model, replay_buffer, lr=args.model_lr)
 
     # gps_planner = iLQR(model, T=args.horizon)
-    mpc_planner = ShootingMethod(model, T=args.horizon)
-
+    # mpc_planner = ShootingMethod(model, T=args.horizon)
+    mpc_planner = MPPI(model, T=args.horizon)
     max_frames  = args.max_frames
     max_steps   = args.max_steps
     frame_skip = args.frame_skip
