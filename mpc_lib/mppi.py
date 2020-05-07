@@ -17,7 +17,7 @@ class MPPI(object):
 
         self.a = torch.zeros(T, self.num_actions).to(self.device)
         self.eps = Normal(torch.zeros(self.samples, self.num_actions).to(self.device),
-                            (torch.ones(self.samples, self.num_actions) * eps).to(self.device))
+                            (torch.ones(self.samples, self.num_actions)*eps).to(self.device))
 
     def reset(self):
         self.a.zero_()
@@ -32,21 +32,28 @@ class MPPI(object):
             s = s0.repeat(self.samples, 1)
 
             sk, da, log_prob = [], [], []
+            eta = None
+            gamma = 0.5
             for t in range(self.t_H):
                 eps = self.eps.sample()
-                v = self.a[t].expand_as(eps) + eps
+                eta = eps
+                # if eta is None:
+                #     eta = eps
+                # else:
+                #     eta = gamma*eta + ((1-gamma**2)**0.5) * eps
+                v = self.a[t].expand_as(eta) + eta
                 s, rew = self.model.step(s, v)
-                log_prob.append(self.eps.log_prob(eps).sum(1))
-                da.append(eps)
+                log_prob.append(self.eps.log_prob(eta).sum(1))
+                da.append(eta)
                 sk.append(rew.squeeze())
 
             sk = torch.stack(sk)
             sk = torch.cumsum(sk.flip(0), 0).flip(0)
             log_prob = torch.stack(log_prob)
 
-            sk = sk.div(self.lam) + self.lam*log_prob
+            sk = sk + self.lam*log_prob
             sk = sk - torch.max(sk, dim=1, keepdim=True)[0]
-            w = torch.exp(sk) + 1e-5
+            w = torch.exp(sk.div(self.lam)) + 1e-5
             w.div_(torch.sum(w, dim=1, keepdim=True))
             for t in range(self.t_H):
                 self.a[t] = self.a[t] + torch.mv(da[t].T, w[t])

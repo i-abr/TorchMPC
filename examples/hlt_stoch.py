@@ -11,12 +11,13 @@ sys.path.append('../')
 import envs
 
 import torch
-from mpc_lib import iLQR
-from mpc_lib import ShootingMethod
-from mpc_lib import MPPI
-
+from sac_lib import SoftActorCritic
+from sac_lib import PolicyNetwork
+from sac_lib import ReplayBuffer
+from sac_lib import NormalizedActions
+from hlt_lib import StochPolicyWrapper
 from model import ModelOptimizer, Model, SARSAReplayBuffer
-from normalized_actions import NormalizedActions
+
 import argparse
 
 parser = argparse.ArgumentParser()
@@ -26,11 +27,16 @@ parser.add_argument('--max_frames', type=int,   default=10000)
 parser.add_argument('--frame_skip', type=int,   default=2)
 parser.add_argument('--model_lr',   type=float, default=3e-4)
 parser.add_argument('--policy_lr',  type=float, default=3e-4)
+parser.add_argument('--value_lr',   type=float, default=3e-4)
+parser.add_argument('--soft_q_lr',  type=float, default=3e-4)
 
 parser.add_argument('--seed', type=int, default=666)
 
 parser.add_argument('--horizon', type=int, default=5)
 parser.add_argument('--model_iter', type=int, default=2)
+parser.add_argument('--trajectory_samples', type=int, default=60)
+parser.add_argument('--lam',  type=float, default=0.1)
+
 
 parser.add_argument('--done_util', dest='done_util', action='store_true')
 parser.add_argument('--no_done_util', dest='done_util', action='store_false')
@@ -79,17 +85,31 @@ if __name__ == '__main__':
         device  = 'cuda:0'
         print('Using GPU Accel')
 
-    model       = Model(state_dim, action_dim, def_layers=[200]).to(device)
+    policy_net = PolicyNetwork(state_dim, action_dim, hidden_dim).to(device)
+
+    model = Model(state_dim, action_dim, def_layers=[200]).to(device)
     # model = MDNModel(state_dim, action_dim, def_layers=[200, 200])
 
-    replay_buffer_size = 100000
+
+    replay_buffer_size = 1000000
+    replay_buffer = ReplayBuffer(replay_buffer_size)
+
     model_replay_buffer = SARSAReplayBuffer(replay_buffer_size)
     model_optim = ModelOptimizer(model, model_replay_buffer, lr=args.model_lr)
+
     # model_optim = MDNModelOptimizer(model, replay_buffer, lr=args.model_lr)
 
-    # gps_planner = iLQR(model, T=args.horizon)
-    # mpc_planner = ShootingMethod(model, T=args.horizon)
-    mpc_planner = MPPI(model, T=args.horizon)
+
+    sac = SoftActorCritic(policy=policy_net,
+                          state_dim=state_dim,
+                          action_dim=action_dim,
+                          replay_buffer=replay_buffer,
+                          policy_lr=args.policy_lr,
+                          value_lr=args.value_lr,
+                          soft_q_lr=args.soft_q_lr)
+
+    hybrid_policy = StochPolicyWrapper(model, policy_net, samples=args.trajectory_samples, t_H=args.horizon, lam=args.lam)
+
     max_frames  = args.max_frames
     max_steps   = args.max_steps
     frame_skip = args.frame_skip
@@ -101,10 +121,9 @@ if __name__ == '__main__':
     ep_num = 0
     while frame_idx < max_frames:
         state = env.reset()
-        mpc_planner.reset()
+        hybrid_policy.reset()
 
-        action = mpc_planner.update(state)
-        # action = policy_net.get_action(state)
+        action = hybrid_policy(state)
 
         episode_reward = 0
         done = False
@@ -112,15 +131,13 @@ if __name__ == '__main__':
             for _ in range(frame_skip):
                 next_state, reward, done, _ = env.step(action.copy())
 
-            next_action = mpc_planner.update(next_state)
-            # next_action = policy_net.get_action(next_state)
-            if True:
-                eps = 1.0 * (0.995**frame_idx)
-                next_action = next_action + np.random.normal(0., eps, size=(action_dim,))
+            next_action = hybrid_policy(next_state)
 
+            replay_buffer.push(state, action, reward, next_state, done)
             model_replay_buffer.push(state, action, reward, next_state, next_action, done)
 
-            if len(model_replay_buffer) > batch_size:
+            if len(replay_buffer) > batch_size:
+                sac.update(batch_size)
                 model_optim.update_model(batch_size, mini_iter=args.model_iter)
 
             state = next_state
@@ -140,18 +157,18 @@ if __name__ == '__main__':
                     )
                 )
 
-                # pickle.dump(rewards, open(path + 'reward_data' + '.pkl', 'wb'))
-                # torch.save(policy_net.state_dict(), path + 'policy_' + str(frame_idx) + '.pt')
-                # torch.save(model.state_dict(), path + 'model_' + str(frame_idx) + '.pt')
+                pickle.dump(rewards, open(path + 'reward_data' + '.pkl', 'wb'))
+                torch.save(policy_net.state_dict(), path + 'policy_' + str(frame_idx) + '.pt')
+                torch.save(model.state_dict(), path + 'model_' + str(frame_idx) + '.pt')
 
             if args.done_util:
                 if done:
                     break
-
-        print('ep rew', ep_num, episode_reward)
+        if len(replay_buffer) > batch_size:
+            print('ep rew', ep_num, episode_reward)
         rewards.append([frame_idx, episode_reward])
         ep_num += 1
     print('saving final data set')
-    # pickle.dump(rewards, open(path + 'reward_data'+ '.pkl', 'wb'))
-    # torch.save(policy_net.state_dict(), path + 'policy_' + 'final' + '.pt')
-    # torch.save(model.state_dict(), path + 'model_' + 'final' + '.pt')
+    pickle.dump(rewards, open(path + 'reward_data'+ '.pkl', 'wb'))
+    torch.save(policy_net.state_dict(), path + 'policy_' + 'final' + '.pt')
+    torch.save(model.state_dict(), path + 'model_' + 'final' + '.pt')
