@@ -32,7 +32,6 @@ parser.add_argument('--seed', type=int, default=666)
 parser.add_argument('--horizon', type=int, default=5)
 parser.add_argument('--model_iter', type=int, default=2)
 
-parser.add_argument('--log-dir', type=str, default='None')
 parser.add_argument('--method', type=str, default='shooting')
 
 parser.add_argument('--done_util', dest='done_util', action='store_true')
@@ -43,6 +42,9 @@ parser.add_argument('--render', dest='render', action='store_true')
 parser.add_argument('--no_render', dest='render', action='store_false')
 parser.set_defaults(render=False)
 
+parser.add_argument('--log', dest='log', action='store_true')
+parser.add_argument('--no-log', dest='log', action='store_false')
+parser.set_defaults(log=False)
 args = parser.parse_args()
 
 
@@ -66,7 +68,7 @@ if __name__ == '__main__':
     torch.manual_seed(args.seed)
 
 
-    if args.log_dir != 'None':
+    if args.log:
         now = datetime.now()
         date_str = now.strftime("%Y-%m-%d_%H-%M-%S/")
 
@@ -146,7 +148,7 @@ if __name__ == '__main__':
                     )
                 )
 
-                if args.log_dir != 'None':
+                if args.log:
                     print('saving model and reward')
                     pickle.dump(rewards, open(path + 'reward_data' + '.pkl', 'wb'))
                     torch.save(model.state_dict(), path + 'model_' + str(frame_idx) + '.pt')
@@ -159,7 +161,7 @@ if __name__ == '__main__':
         rewards.append([frame_idx, episode_reward])
         ep_num += 1
 
-    if args.log_dir != 'None':
+    if args.log:
         print('saving final data set')
         pickle.dump(rewards, open(path + 'reward_data' + '.pkl', 'wb'))
         torch.save(model.state_dict(), path + 'model_' + 'final' + '.pt')
