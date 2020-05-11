@@ -11,7 +11,7 @@ do
                 --max_steps 1000 \
                 --model_iter 5 \
                 --seed $seed \
-                --no-log \
+                --log \
                 --render
     echo "trial $i out of $trials"
 done
