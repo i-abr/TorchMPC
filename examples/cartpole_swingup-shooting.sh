@@ -4,7 +4,7 @@ for seed in 0 1 42 666 1234
 do
     python3 main.py \
                 --env 'InvertedPendulumSwingupBulletEnv' \
-                --method 'mppi' \
+                --method 'shooting' \
                 --max_frames 10000 \
                 --frame_skip 4 \
                 --horizon 5 \
