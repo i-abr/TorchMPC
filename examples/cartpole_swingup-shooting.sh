@@ -5,7 +5,7 @@ do
     python3 main.py \
                 --env 'InvertedPendulumSwingupBulletEnv' \
                 --method 'shooting' \
-                --max_frames 10000 \
+                --max_frames 20000 \
                 --frame_skip 4 \
                 --horizon 5 \
                 --max_steps 1000 \

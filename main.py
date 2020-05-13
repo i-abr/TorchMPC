@@ -66,6 +66,7 @@ if __name__ == '__main__':
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
     torch.manual_seed(args.seed)
+    torch.cuda.manual_seed_all(args.seed)
 
 
     if args.log:
