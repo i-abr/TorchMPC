@@ -12,6 +12,7 @@ env_list = {
     'AntBulletEnv' : gym_locomotion_envs.AntBulletEnv,
     'ReacherBulletEnv' : gym_manipulator_envs.ReacherBulletEnv,
     'PendulumEnv' : classic_control.PendulumEnv,
+    'Walker2DEnv' : gym_locomotion_envs.Walker2DBulletEnv,
 }
 
 def getlist():

@@ -63,17 +63,17 @@ if __name__ == '__main__':
     env.seed(args.seed)
     np.random.seed(args.seed)
     random.seed(args.seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 
     if args.log:
         now = datetime.now()
         date_str = now.strftime("%Y-%m-%d_%H-%M-%S/")
-
-        path = './data/' + args.method +  '/' + args.env + '/' + date_str
+        dir_name = 'seed_{}/'.format(str(args.seed))
+        path = './data/' + args.method +  '/' + args.env + '/' + dir_name
         if os.path.exists(path) is False:
             os.makedirs(path)
 
