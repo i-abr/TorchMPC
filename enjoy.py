@@ -8,6 +8,8 @@ import os
 
 # local imports
 import envs
+import gym
+from gym import wrappers
 
 import torch
 from mpc_lib import iLQR
@@ -41,11 +43,11 @@ parser.set_defaults(done_util=True)
 
 parser.add_argument('--render', dest='render', action='store_true')
 parser.add_argument('--no_render', dest='render', action='store_false')
-parser.set_defaults(render=True)
+parser.set_defaults(render=False)
 
-parser.add_argument('--log', dest='log', action='store_true')
-parser.add_argument('--no-log', dest='log', action='store_false')
-parser.set_defaults(log=False)
+parser.add_argument('--record', dest='record', action='store_true')
+parser.add_argument('--no-record', dest='record', action='store_false')
+parser.set_defaults(record=False)
 args = parser.parse_args()
 
 
@@ -58,7 +60,11 @@ if __name__ == '__main__':
     except TypeError as err:
         print('no argument render,  assumping env.render will just work')
         env = NormalizedActions(envs.env_list[env_name]())
+
     assert np.any(np.abs(env.action_space.low) <= 1.) and  np.any(np.abs(env.action_space.high) <= 1.), 'Action space not normalizd'
+
+    if args.record:
+        env = gym.wrappers.Monitor(env, 'recording', force=True)
     env.reset()
 
     env.seed(args.seed)
@@ -94,27 +100,27 @@ if __name__ == '__main__':
     rewards     = []
 
     ep_num = 0
-    while frame_idx < max_frames:
-        state = env.reset()
-        mpc_planner.reset()
+    state = env.reset()
+    mpc_planner.reset()
 
-        episode_reward = 0
-        done = False
-        for step in range(max_steps):
+    episode_reward = 0
+    done = False
+    for step in range(max_steps):
 
-            action = mpc_planner.update(state)
-            for _ in range(frame_skip):
-                state, reward, done, _ = env.step(action.copy())
-            episode_reward += reward
-            frame_idx += 1
+        action = mpc_planner.update(state)
+        for _ in range(frame_skip):
+            state, reward, done, _ = env.step(action.copy())
+        episode_reward += reward
+        frame_idx += 1
 
-            if args.render:
-                env.render("human")
+        if args.render:
+            env.render("rgb_array")
 
-            if args.done_util:
-                if done:
-                    break
+        if args.done_util:
+            if done:
+                break
 
-        print('ep rew', ep_num, episode_reward)
-        rewards.append([frame_idx, episode_reward])
-        ep_num += 1
+    print('ep rew', ep_num, episode_reward)
+    rewards.append([frame_idx, episode_reward])
+    ep_num += 1
+    env.close()
