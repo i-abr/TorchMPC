@@ -22,9 +22,10 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--env',        type=str,   help=envs.getlist())
-parser.add_argument('--max_steps',  type=int,   default=200)
+parser.add_argument('--frame', type=int, default=-1)
+parser.add_argument('--max_steps',  type=int,   default=1000)
 parser.add_argument('--max_frames', type=int,   default=10000)
-parser.add_argument('--frame_skip', type=int,   default=2)
+parser.add_argument('--frame_skip', type=int,   default=1)
 parser.add_argument('--model_lr',   type=float, default=3e-4)
 parser.add_argument('--policy_lr',  type=float, default=3e-4)
 parser.add_argument('--file_path', type=str, default='none')
@@ -64,7 +65,7 @@ if __name__ == '__main__':
     assert np.any(np.abs(env.action_space.low) <= 1.) and  np.any(np.abs(env.action_space.high) <= 1.), 'Action space not normalizd'
 
     if args.record:
-        env = gym.wrappers.Monitor(env, 'recording', force=True)
+        env = gym.wrappers.Monitor(env, './data/vid/mpc/{}-{}'.format(env_name, args.frame), force=True)
     env.reset()
 
     env.seed(args.seed)
@@ -84,9 +85,12 @@ if __name__ == '__main__':
         print('Using GPU Accel')
 
     model = Model(state_dim, action_dim, def_layers=[200]).to(device)
-    # state_dict_dir = './data/'+args.method+'/seed{}/'.format(args.seed) + args.file_name
-    state_dict_path = args.file_path
-    model.load_state_dict(torch.load(state_dict_path, map_location=device))
+    if args.frame == -1:
+        test_frame = 'final'
+    else:
+        test_frame = args.frame
+    state_dict_dir = './data/'+args.method+'/' + env_name + '/seed_{}/model_{}.pt'.format(args.seed, test_frame)
+    model.load_state_dict(torch.load(state_dict_dir, map_location=device))
 
 
     methods = {'ilqr' : iLQR, 'shooting': ShootingMethod, 'mppi' : MPPI}
@@ -110,11 +114,12 @@ if __name__ == '__main__':
         action = mpc_planner.update(state)
         for _ in range(frame_skip):
             state, reward, done, _ = env.step(action.copy())
+            if done: break
         episode_reward += reward
         frame_idx += 1
 
         if args.render:
-            env.render("rgb_array")
+            env.render("rgb_array", width=320*2, height=240*2)
 
         if args.done_util:
             if done:
