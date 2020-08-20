@@ -31,7 +31,7 @@ parser.add_argument('--seed', type=int, default=666)
 parser.add_argument('--horizon', type=int, default=5)
 parser.add_argument('--model_iter', type=int, default=2)
 
-parser.add_argument('--method', type=str, default='shooting')
+parser.add_argument('--method', type=str, default='mppi')
 
 parser.add_argument('--done_util', dest='done_util', action='store_true')
 parser.add_argument('--no_done_util', dest='done_util', action='store_false')
@@ -80,6 +80,8 @@ if __name__ == '__main__':
     state_dim  = env.observation_space.shape[0]
 
     device ='cpu'
+    print(torch.cuda.is_available())
+    input()
     if torch.cuda.is_available():
         device  = 'cuda:0'
         print('Using GPU Accel')
