@@ -81,7 +81,6 @@ if __name__ == '__main__':
 
     device ='cpu'
     print(torch.cuda.is_available())
-    input()
     if torch.cuda.is_available():
         device  = 'cuda:0'
         print('Using GPU Accel')
@@ -139,7 +138,7 @@ if __name__ == '__main__':
             frame_idx += 1
 
             if args.render:
-                env.render("human")
+                env.render('human')
 
 
             if frame_idx % (max_frames//10) == 0:
